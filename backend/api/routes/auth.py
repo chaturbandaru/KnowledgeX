@@ -66,7 +66,15 @@ async def register(
         
         # Create user in database
         user_in_db = UserInDB(**user_dict)
-        await db.users.insert_one(user_in_db.model_dump(by_alias=True))
+        
+        # Get document to insert with all fields
+        doc_to_insert = user_in_db.model_dump(by_alias=True, exclude_none=False)
+        
+        # Debug logging
+        logger.info(f"Inserting user document with fields: {list(doc_to_insert.keys())}")
+        logger.info(f"Has hashed_password: {'hashed_password' in doc_to_insert}")
+        
+        await db.users.insert_one(doc_to_insert)
         
         # Create access and refresh tokens
         token_data = {

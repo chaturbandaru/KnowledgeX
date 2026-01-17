@@ -3,23 +3,25 @@ User model and schemas for authentication and user management.
 """
 
 from datetime import datetime
-from typing import Optional, List
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from typing import Optional, List, Annotated
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator, BeforeValidator
 from bson import ObjectId
 
 
-class PyObjectId(str):
-    """Custom type for MongoDB ObjectId validation."""
-    
-    @classmethod
-    def __get_validators__(cls):
-        yield cls.validate
-    
-    @classmethod
-    def validate(cls, v):
-        if not ObjectId.is_valid(v):
-            raise ValueError("Invalid ObjectId")
+# Pydantic v2 compatible ObjectId validator
+def validate_object_id(v: any) -> str:
+    """Validate and convert ObjectId to string."""
+    if isinstance(v, ObjectId):
         return str(v)
+    if isinstance(v, str):
+        if ObjectId.is_valid(v):
+            return v
+        raise ValueError("Invalid ObjectId")
+    raise ValueError("Invalid ObjectId type")
+
+
+# Type alias for ObjectId fields
+PyObjectId = Annotated[str, BeforeValidator(validate_object_id)]
 
 
 class SkillItem(BaseModel):
