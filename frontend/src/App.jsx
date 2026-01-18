@@ -26,10 +26,14 @@ const App = () => {
   };
 
   const navigateTo = (page, options = {}) => {
-    setCurrentPage(page);
-    if (options.userId) setViewedUserId(options.userId);
-    if (options.chatUser) setSelectedChatUser(options.chatUser);
-  };
+  setCurrentPage(page);
+  if (options.userId) setViewedUserId(options.userId);
+  if (options.chatUser) {
+    setSelectedChatUser(options.chatUser);
+  } else if (page !== 'messages') {
+    setSelectedChatUser(null); // Clear when not navigating to messages
+  }
+};
 
   return (
     <div>
@@ -88,10 +92,11 @@ const App = () => {
       )}
 
       {currentPage === 'chat' && (
-        <ChatAssistant
-          onBack={() => setCurrentPage('dashboard')}
-        />
-      )}
+  <ChatAssistant
+    userData={userData}
+    onBack={() => setCurrentPage('dashboard')}
+  />
+)}
 
       {currentPage === 'requests' && (
         <Requests

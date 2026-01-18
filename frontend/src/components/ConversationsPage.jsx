@@ -14,10 +14,10 @@ const ConversationsPage = ({ onBack, userData, initialChatUser }) => {
     const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
-        loadConversations();
-        const interval = setInterval(loadConversations, 5000); // Refresh every 5 seconds
-        return () => clearInterval(interval);
-    }, []);
+  loadConversations();
+  const interval = setInterval(loadConversations, 5000);
+  return () => clearInterval(interval);
+}, []);
 
     const loadConversations = async () => {
         try {
