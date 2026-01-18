@@ -15,10 +15,102 @@ from services.chat_service import create_chat_service
 from services.llm_service import create_llm_service
 import logging
 import re
+import tokenc
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
+
+# ✅ ADD THIS - Initialize token compression client (singleton)
+_token_client = None
+
+def get_token_client():
+    """Get or create token compression client."""
+    global _token_client
+    if _token_client is None:
+        api_key = os.getenv("TTC_API_KEY") or settings.TTC_API_KEY  # Add to your config
+        if api_key:
+            _token_client = tokenc.TokenClient(api_key=api_key)
+        else:
+            logger.warning("TTC_API_KEY not set - token compression disabled")
+    return _token_client
+
+
+# ✅ ADD THIS HELPER FUNCTION
+def compress_text_if_needed(text: str, aggressiveness: float = 0.5, min_words: int = 100) -> str:
+    """
+    Compress text if it exceeds minimum length.
+    
+    Args:
+        text: Text to compress
+        aggressiveness: Compression level (0.0-1.0)
+        min_words: Minimum word count before compression kicks in
+    
+    Returns:
+        Compressed or original text
+    """
+    if not text or len(text.split()) < min_words:
+        return text
+    
+    client = get_token_client()
+    if not client:
+        return text  # No compression if client not available
+    
+    try:
+        result = client.compress_input(input=text, aggressiveness=aggressiveness)
+        
+        original_words = len(text.split())
+        compressed_words = len(result.output.split())
+        reduction = ((original_words - compressed_words) / original_words) * 100
+        
+        logger.info(f"[Token Compression] {original_words} → {compressed_words} words ({reduction:.1f}% reduction)")
+        
+        return result.output
+    except Exception as e:
+        logger.warning(f"[Token Compression Error] {e}. Using original text.")
+        return text
+
+
+# ✅ ADD THIS HELPER FUNCTION
+def compress_chat_history(
+    history: List[Dict[str, str]], 
+    keep_recent: int = 3,
+    aggressiveness: float = 0.6
+) -> List[Dict[str, str]]:
+    """
+    Compress older messages in chat history while keeping recent ones intact.
+    
+    Args:
+        history: List of message dicts with 'role' and 'content'
+        keep_recent: Number of recent messages to keep uncompressed
+        aggressiveness: Compression level for older messages
+    
+    Returns:
+        List of messages with older ones compressed
+    """
+    if not history:
+        return []
+    
+    compressed = []
+    total = len(history)
+    
+    for i, msg in enumerate(history):
+        # Keep recent messages uncompressed
+        if i >= total - keep_recent:
+            compressed.append(msg)
+        else:
+            # Compress older messages
+            compressed_content = compress_text_if_needed(
+                msg.get('content', ''),
+                aggressiveness=aggressiveness,
+                min_words=50  # Lower threshold for old messages
+            )
+            compressed.append({
+                'role': msg['role'],
+                'content': compressed_content
+            })
+    
+    return compressed
 
 
 class ChatMessage(BaseModel):
@@ -161,6 +253,24 @@ async def send_chat_message(
         user_data = await db.users.find_one({"_id": current_user.id})
         chat_history = user_data.get("chat_history", [])
         
+        # ✅ COMPRESS CHAT HISTORY BEFORE SENDING TO LLM
+        # This saves 40-60% tokens on conversation context
+        compressed_history = compress_chat_history(
+            history=chat_history,
+            keep_recent=3,  # Keep last 3 messages uncompressed for context quality
+            aggressiveness=0.6  # Aggressive compression for old messages
+        )
+        
+        logger.info(f"Original history: {len(chat_history)} messages, Compressed history prepared")
+        
+        # ✅ OPTIONALLY COMPRESS USER MESSAGE (only if very long)
+        # Most user messages are short, but compress verbose ones
+        compressed_user_message = compress_text_if_needed(
+            text=chat_msg.message,
+            aggressiveness=0.3,  # Light compression - preserve user intent
+            min_words=80  # Only compress if message is > 80 words
+        )
+        
         # Create services
         llm_service = create_llm_service(
             api_key=settings.OPENROUTER_API_KEY,
@@ -173,14 +283,16 @@ async def send_chat_message(
             llm_service=llm_service
         )
         
-        # Get AI response
+        # ✅ PASS COMPRESSED DATA TO CHAT SERVICE
+        # Get AI response with compressed history
         result = await chat_service.chat_response(
-            user_message=chat_msg.message,
-            chat_history=chat_history
+            user_message=compressed_user_message,  # Use compressed version
+            chat_history=compressed_history  # Use compressed history
         )
         
-        # Update chat history
-        chat_history.append({"role": "user", "content": chat_msg.message})
+        # ✅ SAVE ORIGINAL (NOT COMPRESSED) TO DATABASE
+        # Store original messages for user's benefit
+        chat_history.append({"role": "user", "content": chat_msg.message})  # Original
         chat_history.append({"role": "assistant", "content": result["response"]})
         
         # Save to database

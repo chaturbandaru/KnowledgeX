@@ -3,7 +3,7 @@ Configuration management for the Knowledge Debt Exchange backend.
 Loads and validates environment variables using Pydantic Settings.
 """
 
-from typing import List
+from typing import List, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator
 
@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     # Environment
     ENVIRONMENT: str = "development"
     
+
+    TTC_API_KEY: Optional[str] = None
+
     # ==================== OpenRouter Configuration ====================
     OPENROUTER_API_KEY: str
     
