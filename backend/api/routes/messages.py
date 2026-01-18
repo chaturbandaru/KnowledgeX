@@ -3,7 +3,7 @@ Messaging routes for user-to-user communication.
 """
 
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from bson import ObjectId
 from datetime import datetime
@@ -24,9 +24,9 @@ router = APIRouter(prefix="/messages", tags=["Messages"])
 
 @router.post("/request")
 async def send_message_request(
-    to_user_id: str,
-    match_id: str,
-    initial_message: str,
+    to_user_id: str = Query(..., description="ID of user to send request to"),
+    match_id: str = Query(..., description="Associated match ID"),
+    initial_message: str = Query(..., description="Initial message content"),
     current_user: UserInDB = Depends(get_current_active_user),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
@@ -164,6 +164,48 @@ async def accept_message_request(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to accept request"
+        )
+
+
+@router.put("/requests/{request_id}/reject")
+async def reject_message_request(
+    request_id: str,
+    current_user: UserInDB = Depends(get_current_active_user),
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    """Reject a message request."""
+    try:
+        request = await db.message_requests.find_one({"_id": request_id})
+        
+        if not request:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Request not found"
+            )
+        
+        if request["to_user_id"] != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not your request to reject"
+            )
+        
+        # Update status to REJECTED
+        await db.message_requests.update_one(
+            {"_id": request_id},
+            {"$set": {"status": MessageRequestStatus.REJECTED}}
+        )
+        
+        logger.info(f"Message request {request_id} rejected")
+        
+        return {"message": "Request declined"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error rejecting request: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to reject request"
         )
 
 

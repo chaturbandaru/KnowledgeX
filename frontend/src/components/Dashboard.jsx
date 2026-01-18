@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Users, Sparkles } from 'lucide-react';
+import { Search, Users, Sparkles, MessageSquare, Mail } from 'lucide-react';
 import api from '../services/api';
 
-const Dashboard = ({ userData }) => {
+const Dashboard = ({ userData, onNavigateChat, onNavigateRequests }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [experts, setExperts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -60,6 +60,22 @@ const Dashboard = ({ userData }) => {
             <span className="text-xl font-bold text-gray-900">KnowledgeX</span>
           </div>
           <div className="flex items-center gap-4">
+            <button
+              onClick={onNavigateChat}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-all"
+            >
+              <MessageSquare className="w-5 h-5" />
+              AI Chat
+            </button>
+            {onNavigateRequests && (
+              <button
+                onClick={onNavigateRequests}
+                className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-all"
+              >
+                <Mail className="w-5 h-5" />
+                Requests
+              </button>
+            )}
             <button className="p-2 hover:bg-gray-100 rounded-lg transition-all">
               <Users className="w-6 h-6 text-gray-600" />
             </button>

@@ -1,21 +1,22 @@
 import React, { useState } from 'react';
-import { Users, BookOpen, Sparkles, ArrowRight, X } from 'lucide-react';
+import { Users, BookOpen, ArrowRight, X } from 'lucide-react';
 import api from '../services/api';
 
 const ProfileSetup = ({ userData, onComplete }) => {
   const [profileStep, setProfileStep] = useState(1);
   const [formData, setFormData] = useState({
-    displayName: '',
-    bio: '',
-    expertise: [],
-    interests: []
+    displayName: userData?.user?.full_name || '',
+    bio: userData?.user?.bio || '',
+    expertise: userData?.user?.skills_offered?.map(s => s.name) || [],
+    interests: userData?.user?.skills_needed?.map(s => s.name) || []
   });
   const [loading, setLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
   const topics = [
     'JavaScript', 'Python', 'Design', 'Marketing', 'Finance', 
-    'Machine Learning', 'Writing', 'Data Science', 'React', 'Photography'
+    'Machine Learning', 'Writing', 'Data Science', 'React', 'Photography',
+    'UI/UX', 'Web Development', 'Mobile Development', 'DevOps', 'Cloud Computing'
   ];
 
   const handleInputChange = (field, value) => {
@@ -39,6 +40,11 @@ const ProfileSetup = ({ userData, onComplete }) => {
   };
 
   const handleComplete = async () => {
+    if (!formData.displayName.trim()) {
+      alert('Please enter your display name');
+      return;
+    }
+
     setLoading(true);
     
     try {
@@ -47,7 +53,7 @@ const ProfileSetup = ({ userData, onComplete }) => {
       
       setTimeout(() => {
         onComplete(formData);
-      }, 2000);
+      }, 1500);
     } catch (error) {
       console.error('Profile update failed:', error);
       alert('Failed to update profile. Please try again.');
@@ -60,7 +66,7 @@ const ProfileSetup = ({ userData, onComplete }) => {
       <div className="max-w-3xl mx-auto">
         {/* Progress Steps */}
         <div className="flex items-center justify-center mb-8">
-          {[1, 2, 3].map((step) => (
+          {[1, 2].map((step) => (
             <React.Fragment key={step}>
               <div className={`flex items-center justify-center w-12 h-12 rounded-full font-bold transition-all ${
                 profileStep >= step 
@@ -69,7 +75,7 @@ const ProfileSetup = ({ userData, onComplete }) => {
               }`}>
                 {step}
               </div>
-              {step < 3 && (
+              {step < 2 && (
                 <div className={`w-24 h-1 mx-2 transition-all ${
                   profileStep > step ? 'bg-orange-500' : 'bg-gray-200'
                 }`} />
@@ -78,7 +84,7 @@ const ProfileSetup = ({ userData, onComplete }) => {
           ))}
         </div>
 
-        <p className="text-center text-gray-600 mb-8">Step {profileStep} of 3</p>
+        <p className="text-center text-gray-600 mb-8">Step {profileStep} of 2</p>
 
         <div className="bg-white rounded-2xl shadow-2xl p-8">
           {profileStep === 1 && (
@@ -89,13 +95,13 @@ const ProfileSetup = ({ userData, onComplete }) => {
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold text-gray-900">Tell us about yourself</h2>
-                  <p className="text-gray-600">Let others know who you are</p>
+                  <p className="text-gray-600">Update your profile information</p>
                 </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Display Name
+                  Display Name *
                 </label>
                 <input
                   type="text"
@@ -119,15 +125,6 @@ const ProfileSetup = ({ userData, onComplete }) => {
                 />
               </div>
 
-              {showSuccess && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3">
-                  <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-                    <span className="text-white text-sm">✓</span>
-                  </div>
-                  <p className="text-green-800 font-medium">Account created! Let's set up your profile.</p>
-                </div>
-              )}
-
               <button
                 onClick={() => setProfileStep(2)}
                 className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 rounded-lg transition-all flex items-center justify-center gap-2"
@@ -145,139 +142,125 @@ const ProfileSetup = ({ userData, onComplete }) => {
                   <BookOpen className="w-8 h-8 text-orange-500" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900">What do you know?</h2>
-                  <p className="text-gray-600">Add topics you can teach others</p>
+                  <h2 className="text-2xl font-bold text-gray-900">Your Skills & Interests</h2>
+                  <p className="text-gray-600">What can you teach? What do you want to learn?</p>
                 </div>
               </div>
 
               <div>
-                <input
-                  type="text"
-                  placeholder="Add your expertise..."
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all outline-none"
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter' && e.target.value) {
-                      addTopic('expertise', e.target.value);
-                      e.target.value = '';
-                    }
-                  }}
-                />
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {formData.expertise.map((topic) => (
-                  <span
-                    key={topic}
-                    className="bg-orange-500 text-white px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2"
-                  >
-                    {topic}
-                    <button onClick={() => removeTopic('expertise', topic)}>
-                      <X className="w-4 h-4" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-
-              <div>
-                <p className="text-sm font-medium text-gray-700 mb-3">Suggestions:</p>
-                <div className="flex flex-wrap gap-2">
-                  {topics.map((topic) => (
-                    <button
-                      key={topic}
-                      onClick={() => addTopic('expertise', topic)}
-                      className="px-4 py-2 border border-gray-300 rounded-full text-sm hover:border-orange-500 hover:text-orange-500 transition-all"
-                    >
-                      + {topic}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex gap-4">
-                <button
-                  onClick={() => setProfileStep(1)}
-                  className="flex-1 border border-gray-300 text-gray-700 font-semibold py-3 rounded-lg hover:bg-gray-50 transition-all"
-                >
-                  Back
-                </button>
-                <button
-                  onClick={() => setProfileStep(3)}
-                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 rounded-lg transition-all flex items-center justify-center gap-2"
-                >
-                  Continue
-                  <ArrowRight className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {profileStep === 3 && (
-            <div className="space-y-6">
-              <div className="flex items-center gap-4 mb-8">
-                <div className="bg-orange-100 rounded-full p-4">
-                  <Sparkles className="w-8 h-8 text-orange-500" />
-                </div>
+                <label className="block text-sm font-medium text-gray-700 mb-3 font-semibold">
+                  Skills You Can Teach
+                </label>
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900">What do you want to learn?</h2>
-                  <p className="text-gray-600">Add topics you're curious about</p>
+                  <input
+                    type="text"
+                    placeholder="Add a skill you can teach..."
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all outline-none"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && e.target.value.trim()) {
+                        addTopic('expertise', e.target.value.trim());
+                        e.target.value = '';
+                      }
+                    }}
+                  />
+                </div>
+
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {formData.expertise.map((topic) => (
+                    <span
+                      key={topic}
+                      className="bg-orange-500 text-white px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 animate-scaleIn"
+                    >
+                      {topic}
+                      <button 
+                        onClick={() => removeTopic('expertise', topic)}
+                        className="hover:bg-orange-600 p-1 rounded"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+
+                <div>
+                  <p className="text-xs font-medium text-gray-600 mt-4 mb-2">Popular skills:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {topics.filter(t => !formData.expertise.includes(t)).slice(0, 8).map((topic) => (
+                      <button
+                        key={topic}
+                        onClick={() => addTopic('expertise', topic)}
+                        className="px-3 py-1.5 text-xs border border-gray-300 rounded-full hover:border-orange-500 hover:text-orange-500 transition-all hover:bg-orange-50"
+                      >
+                        + {topic}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <input
-                  type="text"
-                  placeholder="Add your interests..."
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all outline-none"
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter' && e.target.value) {
-                      addTopic('interests', e.target.value);
-                      e.target.value = '';
-                    }
-                  }}
-                />
-              </div>
+              <div className="border-t pt-6">
+                <label className="block text-sm font-medium text-gray-700 mb-3 font-semibold">
+                  Skills You Want to Learn
+                </label>
+                <div>
+                  <input
+                    type="text"
+                    placeholder="Add a skill you want to learn..."
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all outline-none"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && e.target.value.trim()) {
+                        addTopic('interests', e.target.value.trim());
+                        e.target.value = '';
+                      }
+                    }}
+                  />
+                </div>
 
-              <div className="flex flex-wrap gap-2">
-                {formData.interests.map((topic) => (
-                  <span
-                    key={topic}
-                    className="bg-gray-800 text-white px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2"
-                  >
-                    {topic}
-                    <button onClick={() => removeTopic('interests', topic)}>
-                      <X className="w-4 h-4" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-
-              <div>
-                <p className="text-sm font-medium text-gray-700 mb-3">Suggestions:</p>
-                <div className="flex flex-wrap gap-2">
-                  {topics.map((topic) => (
-                    <button
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {formData.interests.map((topic) => (
+                    <span
                       key={topic}
-                      onClick={() => addTopic('interests', topic)}
-                      className="px-4 py-2 border border-gray-300 rounded-full text-sm hover:border-orange-500 hover:text-orange-500 transition-all"
+                      className="bg-slate-700 text-white px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 animate-scaleIn"
                     >
-                      + {topic}
-                    </button>
+                      {topic}
+                      <button 
+                        onClick={() => removeTopic('interests', topic)}
+                        className="hover:bg-slate-800 p-1 rounded"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
                   ))}
+                </div>
+
+                <div>
+                  <p className="text-xs font-medium text-gray-600 mt-4 mb-2">Popular interests:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {topics.filter(t => !formData.interests.includes(t)).slice(0, 8).map((topic) => (
+                      <button
+                        key={topic}
+                        onClick={() => addTopic('interests', topic)}
+                        className="px-3 py-1.5 text-xs border border-gray-300 rounded-full hover:border-orange-500 hover:text-orange-500 transition-all hover:bg-orange-50"
+                      >
+                        + {topic}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
               {showSuccess && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3">
-                  <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3 animate-slideDown">
+                  <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
                     <span className="text-white text-sm">✓</span>
                   </div>
-                  <p className="text-green-800 font-medium">Profile created successfully!</p>
+                  <p className="text-green-800 font-medium">Profile updated successfully!</p>
                 </div>
               )}
 
               <div className="flex gap-4">
                 <button
-                  onClick={() => setProfileStep(2)}
+                  onClick={() => setProfileStep(1)}
                   disabled={loading}
                   className="flex-1 border border-gray-300 text-gray-700 font-semibold py-3 rounded-lg hover:bg-gray-50 transition-all disabled:opacity-50"
                 >
@@ -285,8 +268,8 @@ const ProfileSetup = ({ userData, onComplete }) => {
                 </button>
                 <button
                   onClick={handleComplete}
-                  disabled={loading}
-                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                  disabled={loading || !formData.displayName.trim()}
+                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? 'Saving...' : 'Complete Setup'}
                   {!loading && <ArrowRight className="w-5 h-5" />}
@@ -296,6 +279,38 @@ const ProfileSetup = ({ userData, onComplete }) => {
           )}
         </div>
       </div>
+
+      <style jsx>{`
+        @keyframes scaleIn {
+          from {
+            opacity: 0;
+            transform: scale(0.9);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+
+        @keyframes slideDown {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .animate-scaleIn {
+          animation: scaleIn 0.2s ease-out;
+        }
+
+        .animate-slideDown {
+          animation: slideDown 0.3s ease-out;
+        }
+      `}</style>
     </div>
   );
 };

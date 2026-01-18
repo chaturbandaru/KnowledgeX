@@ -113,6 +113,9 @@ async def health_check():
 app.include_router(auth.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
 app.include_router(matching.router, prefix="/api")
+app.include_router(barter.router, prefix="/api")
+app.include_router(chat.router, prefix="/api")
+app.include_router(messages.router, prefix="/api")
 
 
 # ==================== Error Handlers ====================
@@ -140,13 +143,6 @@ async def internal_error_handler(request, exc):
             "message": "An unexpected error occurred. Please try again later."
         }
     )
-
-app.include_router(auth.router, prefix="/api")
-app.include_router(users.router, prefix="/api")
-app.include_router(matching.router, prefix="/api")
-app.include_router(barter.router, prefix="/api")
-app.include_router(chat.router, prefix="/api")
-app.include_router(messages.router, prefix="/api")
 # ==================== Run Application ====================
 
 if __name__ == "__main__":

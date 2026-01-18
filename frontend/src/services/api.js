@@ -17,16 +17,29 @@ class ApiService {
         },
       });
       
-      const data = await response.json();
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
       
-      if (!response.ok) {
-        console.error('API Error:', data);
-        throw new Error(data.detail || 'Request failed');
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        console.error('Failed to parse JSON:', jsonError);
+        throw new Error('Invalid response format from server');
       }
       
+      if (!response.ok) {
+        console.error('API Error Response:', data);
+        throw new Error(data.detail || data.message || 'Request failed');
+      }
+      
+      console.log('API Success:', data);
       return data;
     } catch (error) {
-      console.error('Request failed:', error);
+      console.error('Request failed with error:', error);
+      if (error instanceof TypeError) {
+        throw new Error('Failed to connect to server. Make sure backend is running on http://localhost:8000');
+      }
       throw error;
     }
   }
@@ -68,14 +81,34 @@ class ApiService {
   }
 
   async updateProfile(profileData) {
+    // Convert string arrays to SkillItem objects
+    const convertToSkillItems = (skills) => {
+      if (!skills || skills.length === 0) return [];
+      return skills.map(skill => ({
+        name: skill,
+        description: '',
+        category: '',
+        proficiency_level: 'beginner',
+        tags: []
+      }));
+    };
+
+    const updateData = {
+      full_name: profileData.displayName || '',
+      bio: profileData.bio || ''
+    };
+
+    // Only include skills if provided
+    if (profileData.expertise && profileData.expertise.length > 0) {
+      updateData.skills_offered = convertToSkillItems(profileData.expertise);
+    }
+    if (profileData.interests && profileData.interests.length > 0) {
+      updateData.skills_needed = convertToSkillItems(profileData.interests);
+    }
+
     return this.request('/users/me', {
       method: 'PUT',
-      body: JSON.stringify({
-        full_name: profileData.displayName,
-        bio: profileData.bio,
-        skills_offered: profileData.expertise,
-        skills_needed: profileData.interests
-      }),
+      body: JSON.stringify(updateData),
     });
   }
 
@@ -101,6 +134,70 @@ class ApiService {
     return this.request('/matches/connect', {
       method: 'POST',
       body: JSON.stringify({ target_user_id: userId }),
+    });
+  }
+
+  // Chat methods
+  async sendChatMessage(message) {
+    return this.request('/chat/message', {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    });
+  }
+
+  async getChatHistory() {
+    return this.request('/chat/history', {
+      method: 'GET',
+    });
+  }
+
+  async clearChatHistory() {
+    return this.request('/chat/history', {
+      method: 'DELETE',
+    });
+  }
+
+  // Message/Request methods
+  async sendMessageRequest(toUserId, matchId, initialMessage) {
+    return this.request(
+      `/messages/request?to_user_id=${encodeURIComponent(toUserId)}&match_id=${encodeURIComponent(matchId)}&initial_message=${encodeURIComponent(initialMessage)}`,
+      {
+        method: 'POST',
+      }
+    );
+  }
+
+  async getIncomingRequests() {
+    return this.request('/messages/requests/incoming', {
+      method: 'GET',
+    });
+  }
+
+  async acceptMessageRequest(requestId) {
+    return this.request(`/messages/requests/${requestId}/accept`, {
+      method: 'PUT',
+    });
+  }
+
+  async sendMessage(toUserId, content) {
+    return this.request('/messages/send', {
+      method: 'POST',
+      body: JSON.stringify({
+        to_user_id: toUserId,
+        content: content,
+      }),
+    });
+  }
+
+  async getConversation(otherUserId) {
+    return this.request(`/messages/conversation/${otherUserId}`, {
+      method: 'GET',
+    });
+  }
+
+  async rejectMessageRequest(requestId) {
+    return this.request(`/messages/requests/${requestId}/reject`, {
+      method: 'PUT',
     });
   }
 }

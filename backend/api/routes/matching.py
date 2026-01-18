@@ -276,6 +276,129 @@ async def update_match_status(
         )
 
 
+@router.post("/connect")
+async def connect_with_user(
+    matched_user_id: str = Query(..., description="ID of user to connect with"),
+    current_user: UserInDB = Depends(get_current_active_user),
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    """
+    Send a connection request to another user.
+    
+    This creates a match record between the current user and the target user.
+    The match will have a PENDING status and must be accepted by the target user.
+    """
+    try:
+        # Check if target user exists
+        target_user_data = await db.users.find_one({"_id": matched_user_id})
+        if not target_user_data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        # Check if already connected
+        existing_match = await db.matches.find_one({
+            "$or": [
+                {"user_id": current_user.id, "matched_user_id": matched_user_id},
+                {"user_id": matched_user_id, "matched_user_id": current_user.id}
+            ]
+        })
+        
+        if existing_match:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Connection already exists with this user"
+            )
+        
+        # Create connection match
+        from models.match import MatchCreate
+        storage_service = StorageService(db)
+        
+        match_create = MatchCreate(
+            user_id=current_user.id,
+            matched_user_id=matched_user_id,
+            skill_offered="Any",
+            skill_needed="Any",
+            match_score=0.5,
+            confidence=0.5,
+            explanation="User initiated connection",
+            metadata={"connection_type": "manual"}
+        )
+        
+        created_match = await storage_service.create_match(match_create)
+        
+        if not created_match:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create connection"
+            )
+        
+        logger.info(f"User {current_user.id} connected with {matched_user_id}")
+        
+        return {
+            "message": "Connection request sent",
+            "match_id": created_match.id,
+            "status": created_match.status
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating connection: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create connection"
+        )
+
+
+@router.get("/search")
+async def search_users(
+    q: str = Query(..., min_length=1, description="Search query for users or skills"),
+    current_user: UserInDB = Depends(get_current_active_user),
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    """
+    Search for users by name, bio, or skills offered.
+    
+    Excludes current user and returns matching users with their skills.
+    """
+    try:
+        search_lower = q.lower().strip()
+        
+        # Build search query - search in username, full_name, bio, and skills
+        search_query = {
+            "_id": {"$ne": current_user.id},  # Exclude current user
+            "is_active": {"$ne": False},
+            "$or": [
+                {"username": {"$regex": search_lower, "$options": "i"}},
+                {"full_name": {"$regex": search_lower, "$options": "i"}},
+                {"bio": {"$regex": search_lower, "$options": "i"}},
+                {"skills_offered.name": {"$regex": search_lower, "$options": "i"}},
+            ]
+        }
+        
+        cursor = db.users.find(search_query).limit(20)
+        users = await cursor.to_list(length=20)
+        
+        # Convert to response format
+        from models.user import UserResponse
+        results = [
+            UserResponse(**user) for user in users
+        ]
+        
+        logger.info(f"User {current_user.id} searched for '{q}' - found {len(results)} results")
+        
+        return results
+        
+    except Exception as e:
+        logger.error(f"Search error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Search failed"
+        )
+
+
 @router.get("/{match_id}", response_model=MatchResponse)
 async def get_match_by_id(
     match_id: str,
