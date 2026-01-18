@@ -12,6 +12,7 @@ from contextlib import asynccontextmanager
 from backend.core.config import settings
 from backend.core.database import db_manager
 from backend.api.routes import auth, users, matching
+from api.routes import auth, users, matching, barter, chat, messages 
 
 # Configure logging
 logging.basicConfig(
@@ -140,7 +141,12 @@ async def internal_error_handler(request, exc):
         }
     )
 
-
+app.include_router(auth.router, prefix="/api")
+app.include_router(users.router, prefix="/api")
+app.include_router(matching.router, prefix="/api")
+app.include_router(barter.router, prefix="/api")
+app.include_router(chat.router, prefix="/api")
+app.include_router(messages.router, prefix="/api")
 # ==================== Run Application ====================
 
 if __name__ == "__main__":

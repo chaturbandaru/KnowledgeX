@@ -22,20 +22,20 @@ async def test_embeddings():
     print("=" * 60)
     
     # Connect to MongoDB
-    print(f"\n✓ Connecting to MongoDB...")
+    print(f"\nConnecting to MongoDB...")
     client = AsyncIOMotorClient(settings.MONGO_URL)
     db = client[settings.DATABASE_NAME]
     
     try:
         # Verify connection
         await client.admin.command('ping')
-        print(f"✓ MongoDB connected: {settings.DATABASE_NAME}")
+        print(f"MongoDB connected: {settings.DATABASE_NAME}")
     except Exception as e:
-        print(f"✗ MongoDB connection failed: {e}")
+        print(f"MongoDB connection failed: {e}")
         return
     
     # Create embedding service
-    print(f"\n✓ Initializing OpenRouter...")
+    print(f"\nInitializing OpenRouter...")
     print(f"  Model: {settings.EMBEDDING_MODEL}")
     
     try:
@@ -45,10 +45,10 @@ async def test_embeddings():
             model=settings.EMBEDDING_MODEL
         )
         
-        print(f"✓ Service initialized")
+        print(f"Service initialized")
         print(f"  Dimension: {embed_service.dimension}")
     except Exception as e:
-        print(f"✗ Service initialization failed: {e}")
+        print(f"Service initialization failed: {e}")
         client.close()
         return
     
@@ -62,11 +62,11 @@ async def test_embeddings():
             text="Python programming and FastAPI development"
         )
         
-        print(f"✓ Embedding generated")
+        print(f"Embedding generated")
         print(f"  First 5 dimensions: {[f'{x:.4f}' for x in vec1[:5]]}")
         print(f"  Total dimensions: {len(vec1)}")
     except Exception as e:
-        print(f"✗ Embedding generation failed: {e}")
+        print(f"Embedding generation failed: {e}")
         client.close()
         return
     
@@ -81,7 +81,7 @@ async def test_embeddings():
         )
         
         cache_works = vec1 == vec2
-        print(f"✓ Cache test: {'PASSED' if cache_works else 'FAILED'}")
+        print(f"Cache test: {'PASSED' if cache_works else 'FAILED'}")
         print(f"  Vectors match: {cache_works}")
     except Exception as e:
         print(f"✗ Cache test failed: {e}")
@@ -97,11 +97,11 @@ async def test_embeddings():
         )
         
         similarity = embed_service.cosine_similarity(vec1, vec3)
-        print(f"✓ Similarity computed")
+        print(f"Similarity computed")
         print(f"  'Python FastAPI' vs 'Python web frameworks': {similarity:.4f}")
         print(f"  Expected: High similarity (>0.7)")
     except Exception as e:
-        print(f"✗ Similarity test failed: {e}")
+        print(f" Similarity test failed: {e}")
     
     # Test 4: Test unrelated text
     print(f"\n[Test 4] Testing similarity with unrelated text...")
@@ -114,11 +114,11 @@ async def test_embeddings():
         )
         
         similarity2 = embed_service.cosine_similarity(vec1, vec4)
-        print(f"✓ Similarity computed")
+        print(f"Similarity computed")
         print(f"  'Python FastAPI' vs 'Graphic Design': {similarity2:.4f}")
         print(f"  Expected: Low similarity (<0.5)")
     except Exception as e:
-        print(f"✗ Unrelated similarity test failed: {e}")
+        print(f"Unrelated similarity test failed: {e}")
     
     # Test 5: Batch embedding
     print(f"\n[Test 5] Testing batch embedding...")
@@ -130,14 +130,14 @@ async def test_embeddings():
         ]
         
         batch_vecs = await embed_service.embed_many(texts)
-        print(f"✓ Batch embedding completed")
+        print(f"Batch embedding completed")
         print(f"  Generated {len(batch_vecs)} embeddings")
         print(f"  Each with {len(batch_vecs[0])} dimensions")
     except Exception as e:
         print(f"✗ Batch embedding failed: {e}")
     
     print("\n" + "=" * 60)
-    print("✓ All tests completed!")
+    print("All tests completed!")
     print("=" * 60)
     
     client.close()
@@ -149,6 +149,6 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\n\nTests interrupted by user")
     except Exception as e:
-        print(f"\n\n✗ Unexpected error: {e}")
+        print(f"\n\nUnexpected error: {e}")
         import traceback
         traceback.print_exc()

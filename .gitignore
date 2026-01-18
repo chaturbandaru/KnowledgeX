@@ -2,6 +2,7 @@ venv/
 .env.example
 backend/.env
 backend/venv/
+frontend/ven/
 .env
 __pycache__/
 *.py[cod]
@@ -9,3 +10,5 @@ __pycache__/
 backend/core/__pycache__
 __pycache__/
 *.py[cod]
+.ven/
+*ven/
