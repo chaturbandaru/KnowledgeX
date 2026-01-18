@@ -19,76 +19,30 @@ from services.matching_service import create_matching_service
 from models.user import UserInDB, SkillItem
 from bson import ObjectId
 from core.config import settings
+import json as json
 
 
 async def setup_test_users(db):
     """Create test users for matching."""
     users_collection = db.users
-    
-    # Clear existing test users
+
+#Clear existing test users
     await users_collection.delete_many({"email": {"$regex": "test.*@example.com"}})
-    
+
     now = datetime.utcnow()
-    
-    test_users = [
-        {
-            "_id": "test_user_1",
-            "email": "test1@example.com",
-            "username": "alice_python",
-            "full_name": "Alice Python",
-            "hashed_password": "dummy",
-            "skills_offered": [
-                {"name": "Python programming", "proficiency_level": "expert", "description": "10 years of Python experience, FastAPI, Django", "tags": []},
-                {"name": "Machine Learning", "proficiency_level": "advanced", "description": "TensorFlow, PyTorch, scikit-learn", "tags": []}
-            ],
-            "skills_needed": [
-                {"name": "React development", "proficiency_level": "beginner", "description": "Want to learn modern React with hooks", "tags": []}
-            ],
-            "is_active": True,
-            "is_verified": True,
-            "created_at": now,
-            "updated_at": now
-        },
-        {
-            "_id": "test_user_2",
-            "email": "test2@example.com",
-            "username": "bob_react",
-            "full_name": "Bob React",
-            "hashed_password": "dummy",
-            "skills_offered": [
-                {"name": "React development", "proficiency_level": "expert", "description": "React, Next.js, TypeScript", "tags": []},
-                {"name": "UI/UX design", "proficiency_level": "intermediate", "description": "Figma, user research", "tags": []}
-            ],
-            "skills_needed": [
-                {"name": "Python backend", "proficiency_level": "intermediate", "description": "Want to build APIs with FastAPI", "tags": []}
-            ],
-            "is_active": True,
-            "is_verified": True,
-            "created_at": now,
-            "updated_at": now
-        },
-        {
-            "_id": "test_user_3",
-            "email": "test3@example.com",
-            "username": "charlie_data",
-            "full_name": "Charlie Data",
-            "hashed_password": "dummy",
-            "skills_offered": [
-                {"name": "Data analysis", "proficiency_level": "advanced", "description": "Pandas, SQL, data visualization", "tags": []},
-            ],
-            "skills_needed": [
-                {"name": "Deep learning", "proficiency_level": "beginner", "description": "Neural networks and transformers", "tags": []}
-            ],
-            "is_active": True,
-            "is_verified": True,
-            "created_at": now,
-            "updated_at": now
-        }
-    ]
-    
+
+#Load users from JSON
+    fixture_path = Path(__file__).parent / "test_users.json"
+    with open(fixture_path, "r") as f:
+        test_users = json.load(f)
+
+    # Add timestamps dynamically
+    for user in test_users:
+        user["created_at"] = now
+        user["updated_at"] = now
+
     await users_collection.insert_many(test_users)
     print(f"✓ Created {len(test_users)} test users")
-
 
 async def test_matching():
     print("=" * 60)

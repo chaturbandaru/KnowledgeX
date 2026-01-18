@@ -2,6 +2,7 @@
 Matching service - Hybrid approach with embeddings and LLM re-ranking.
 Phase 1: Embedding-based candidate retrieval
 Phase 2: LLM-based intelligent re-ranking
+Phase 3: Reciprocity and barter detection
 """
 
 from typing import List, Dict, Any, Optional, Tuple
@@ -119,7 +120,7 @@ class MatchingService:
             need_embedding = await self.embedding_service.get_or_create(
                 owner_user_id=user.id,
                 item_type="need",
-                ref_id=need.name,  # Use skill name as ref_id
+                ref_id=need.name,
                 text=need_text
             )
             
@@ -156,8 +157,8 @@ class MatchingService:
                             "skill_needed_description": need.description,
                             "embedding_score": similarity,
                             "helper": helper,
-                            "helper_skill_obj": skill,  # Store the SkillItem object
-                            "seeker_need_obj": need,    # Store the SkillItem object
+                            "helper_skill_obj": skill,
+                            "seeker_need_obj": need,
                             "metadata": {
                                 "helper_proficiency": skill.proficiency_level,
                                 "seeker_level": need.proficiency_level
@@ -285,7 +286,7 @@ class MatchingService:
                 "skill_offered": candidate["skill_offered"],
                 "skill_needed": candidate["skill_needed"],
                 "match_score": candidate["embedding_score"],
-                "confidence": 0.7,  # Medium confidence without LLM
+                "confidence": 0.7,
                 "explanation": f"Based on semantic similarity, this helper's skills in {candidate['skill_offered']} align with your need for {candidate['skill_needed']}.",
                 "is_reciprocal": False,
                 "metadata": candidate["metadata"]
@@ -347,7 +348,7 @@ class MatchingService:
             
             # Mark as reciprocal if mutual help is possible
             if can_help_back:
-                match["is_reciprocal"] = True
+                match["is_reciprocal"] = True  # FIX: Actually set the flag
                 match["metadata"]["reverse_match"] = reverse_match_info
                 logger.info(
                     f"Reciprocal match found: {user.id} ↔ {helper.id} "

@@ -3,9 +3,11 @@ User model and schemas for authentication and user management.
 """
 
 from datetime import datetime
-from typing import Optional, List, Union
+from typing import Optional, List, Union, Dict
 from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
 from bson import ObjectId
+
+
 
 
 class PyObjectId(str):
@@ -131,3 +133,20 @@ class RegisterResponse(BaseModel):
     """Registration response with user data and token."""
     user: UserResponse
     token: Token
+
+
+class UserInDB(UserBase):
+    """User model as stored in database."""
+    id: str = Field(default=None, alias="_id")
+    hashed_password: str
+    skills_offered: List[SkillItem] = Field(default_factory=list)
+    skills_needed: List[SkillItem] = Field(default_factory=list)
+    
+    # NEW: Store chat-extracted needs
+    chat_extracted_needs: Optional[str] = None  # Raw conversation summary
+    chat_history: List[Dict[str, str]] = Field(default_factory=list)  # [{role: "user/assistant", content: "..."}]
+    
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    is_active: bool = True
+    is_verified: bool = False
