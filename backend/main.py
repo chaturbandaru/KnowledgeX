@@ -11,7 +11,6 @@ from contextlib import asynccontextmanager
 
 from backend.core.config import settings
 from backend.core.database import db_manager
-from backend.api.routes import auth, users, matching
 from api.routes import auth, users, matching, barter, chat, messages 
 
 # Configure logging

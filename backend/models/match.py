@@ -3,10 +3,11 @@ Match model for skill matching between users.
 """
 
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Union
 from pydantic import BaseModel, Field, ConfigDict
 from bson import ObjectId
 from enum import Enum
+from .user import UserResponse
 
 
 class MatchStatus(str, Enum):
@@ -47,6 +48,8 @@ class MatchResponse(MatchBase):
     created_at: datetime
     updated_at: datetime
     is_reciprocal: bool = False  # True if both users match each other
+    profile: Optional[UserResponse] = None
+    
     
     model_config = ConfigDict(
         populate_by_name=True,

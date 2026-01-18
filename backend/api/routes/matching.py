@@ -8,7 +8,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from core.database import get_database
 from core.config import settings
-from models.user import UserInDB
+from models.user import UserInDB, UserResponse
 from models.match import MatchResponse, MatchCreate, MatchUpdate, MatchStatus
 from api.middleware.auth import get_current_active_user
 from services.embedding_service import create_openrouter_embedding_service
@@ -172,7 +172,21 @@ async def get_my_matches(
             limit=limit
         )
         
-        return [MatchResponse(**m.model_dump(by_alias=True)) for m in matches]
+        
+        # Get user profiles
+        target_ids = [m.matched_user_id for m in matches]
+        users_cursor = db.users.find({"_id": {"$in": target_ids}})
+        users_list = await users_cursor.to_list(length=len(target_ids))
+        users_map = {str(u["_id"]): u for u in users_list}
+        
+        response = []
+        for m in matches:
+            resp = MatchResponse(**m.model_dump(by_alias=True))
+            if m.matched_user_id in users_map:
+                resp.profile = UserResponse(**users_map[m.matched_user_id])
+            response.append(resp)
+            
+        return response
         
     except Exception as e:
         logger.error(f"Error getting matches: {e}")
@@ -206,7 +220,22 @@ async def get_incoming_matches(
         from models.match import MatchInDB
         matches = [MatchInDB(**m) for m in matches_data]
         
-        return [MatchResponse(**m.model_dump(by_alias=True)) for m in matches]
+        # Get user profiles (seekers)
+        target_ids = [m.user_id for m in matches]
+        users_cursor = db.users.find({"_id": {"$in": target_ids}})
+        users_list = await users_cursor.to_list(length=len(target_ids))
+        users_map = {str(u["_id"]): u for u in users_list}
+        
+        response = []
+        from models.user import UserResponse
+        
+        for m in matches:
+            resp = MatchResponse(**m.model_dump(by_alias=True))
+            if m.user_id in users_map:
+                resp.profile = UserResponse(**users_map[m.user_id])
+            response.append(resp)
+            
+        return response
         
     except Exception as e:
         logger.error(f"Error getting incoming matches: {e}")

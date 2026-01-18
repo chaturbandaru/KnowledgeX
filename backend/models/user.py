@@ -82,24 +82,6 @@ class UserResponse(UserBase):
     )
 
 
-class UserInDB(UserBase):
-    """User model as stored in database."""
-    id: str = Field(default=None, alias="_id")  # Changed from PyObjectId to str
-    hashed_password: str
-    skills_offered: List[SkillItem] = Field(default_factory=list)
-    skills_needed: List[SkillItem] = Field(default_factory=list)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
-    is_active: bool = True
-    is_verified: bool = False
-    
-    model_config = ConfigDict(
-        populate_by_name=True,
-        arbitrary_types_allowed=True,
-        json_encoders={ObjectId: str}
-    )
-
-
 # ==================== Authentication Schemas ====================
 
 class Token(BaseModel):
@@ -150,3 +132,9 @@ class UserInDB(UserBase):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     is_active: bool = True
     is_verified: bool = False
+    
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+        json_encoders={ObjectId: str}
+    )
