@@ -268,7 +268,7 @@ async def send_chat_message(
         compressed_user_message = compress_text_if_needed(
             text=chat_msg.message,
             aggressiveness=0.3,  # Light compression - preserve user intent
-            min_words=80  # Only compress if message is > 80 words
+            min_words=5  # Only compress if message is > 80 words
         )
         
         # Create services
