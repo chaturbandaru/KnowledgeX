@@ -32,6 +32,20 @@ class Settings(BaseSettings):
     # Environment
     ENVIRONMENT: str = "development"
     
+    # ==================== OpenRouter Configuration ====================
+    OPENROUTER_API_KEY: str
+    
+    # Embedding Configuration
+    EMBEDDING_PROVIDER: str = "openrouter"
+    EMBEDDING_MODEL: str = "openai/text-embedding-3-small"
+    EMBEDDING_DIMENSION: int = 1536
+    
+    # LLM Configuration
+    LLM_PROVIDER: str = "openrouter"
+    LLM_MODEL: str = "google/gemma-3-27b-it:free"
+    LLM_TEMPERATURE: float = 0.3
+    LLM_MAX_TOKENS: int = 1000
+    
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

@@ -19,12 +19,17 @@ class DatabaseManager:
     def __init__(self):
         self.client: Optional[AsyncIOMotorClient] = None
         self.db: Optional[AsyncIOMotorDatabase] = None
+        self._connected = False
     
     async def connect(self):
         """
         Connect to MongoDB database.
         Called during application startup.
         """
+        if self._connected:
+            logger.info("Database already connected")
+            return
+            
         try:
             logger.info("Connecting to MongoDB...")
             
@@ -41,6 +46,8 @@ class DatabaseManager:
             
             # Verify connection
             await self.client.admin.command('ping')
+            
+            self._connected = True
             
             logger.info(f"Successfully connected to MongoDB database: {settings.DATABASE_NAME}")
             
@@ -62,6 +69,7 @@ class DatabaseManager:
         if self.client:
             logger.info("Closing MongoDB connection...")
             self.client.close()
+            self._connected = False
             logger.info("MongoDB connection closed")
     
     async def _create_indexes(self):
@@ -134,4 +142,8 @@ async def get_database() -> AsyncIOMotorDatabase:
         async def route(db: AsyncIOMotorDatabase = Depends(get_database)):
             ...
     """
+    # Auto-connect if not connected (failsafe)
+    if not db_manager._connected:
+        await db_manager.connect()
+    
     return db_manager.get_database()

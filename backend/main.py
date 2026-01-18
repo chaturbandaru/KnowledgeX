@@ -9,9 +9,9 @@ from fastapi.responses import JSONResponse
 import logging
 from contextlib import asynccontextmanager
 
-from core.config import settings
-from core.database import db_manager
-from api.routes import auth, users
+from backend.core.config import settings
+from backend.core.database import db_manager
+from backend.api.routes import auth, users, matching
 
 # Configure logging
 logging.basicConfig(
@@ -111,6 +111,7 @@ async def health_check():
 # Include routers
 app.include_router(auth.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
+app.include_router(matching.router, prefix="/api")
 
 
 # ==================== Error Handlers ====================
@@ -146,7 +147,7 @@ if __name__ == "__main__":
     import uvicorn
     
     uvicorn.run(
-        "main:app",
+        "backend.main:app",
         host="0.0.0.0",
         port=8000,
         reload=settings.DEBUG,

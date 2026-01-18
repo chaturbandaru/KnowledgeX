@@ -25,3 +25,10 @@ python-dateutil==2.8.2
 
 # Utilities
 email-validator==2.1.0
+
+# ==================== AI/ML Dependencies ====================
+# OpenRouter (uses OpenAI-compatible API)
+openai==1.12.0
+
+# Vector Operations
+numpy==1.26.3

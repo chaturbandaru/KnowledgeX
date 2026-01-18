@@ -1,1 +1,11 @@
 venv/
+.env.example
+backend/.env
+backend/venv/
+.env
+__pycache__/
+*.py[cod]
+*$py.class
+backend/core/__pycache__
+__pycache__/
+*.py[cod]
