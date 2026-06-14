@@ -4,6 +4,7 @@ backend/.env
 backend/venv/
 frontend/ven/
 .env
+env
 __pycache__/
 *.py[cod]
 *$py.class
