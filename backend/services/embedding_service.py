@@ -11,6 +11,8 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 import numpy as np
 import logging
 
+from utils.similarity import cosine_similarity
+
 logger = logging.getLogger(__name__)
 
 
@@ -332,26 +334,22 @@ class EmbeddingService:
     @staticmethod
     def cosine_similarity(a: Sequence[float], b: Sequence[float]) -> float:
         """
-        Compute cosine similarity between two vectors.
-        
+        Compute cosine similarity between two vectors, in range [-1, 1].
+
+        Delegates to :func:`utils.similarity.cosine_similarity`. Empty vectors
+        return 0.0 (rather than raising) so the matching pipeline degrades
+        gracefully on missing embeddings.
+
         Args:
             a: First vector
             b: Second vector
-            
+
         Returns:
             Cosine similarity in range [-1, 1]
         """
-        va = np.asarray(a, dtype=np.float32)
-        vb = np.asarray(b, dtype=np.float32)
-        
-        na = float(np.linalg.norm(va))
-        nb = float(np.linalg.norm(vb))
-        
-        if na == 0.0 or nb == 0.0:
+        if len(a) == 0 or len(b) == 0:
             return 0.0
-        
-        similarity = float(np.dot(va, vb) / (na * nb))
-        return max(-1.0, min(1.0, similarity))
+        return cosine_similarity(a, b)
 
 
 # ==================== Factory Function ====================
