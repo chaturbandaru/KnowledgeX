@@ -235,14 +235,20 @@ class EmbeddingService:
         text: str,
     ) -> List[float]:
         """
-        Get cached embedding or generate new one.
-        
+        Return the cached embedding for an item, or generate and cache one.
+
+        The cache is keyed by (owner, type, ref_id) and validated against a
+        SHA-256 hash of the text plus the current model name. A cached vector
+        is reused only when both the hash and model match; otherwise the text
+        is re-embedded and the cache entry is upserted. This means editing a
+        skill/need description transparently invalidates its old embedding.
+
         Args:
             owner_user_id: User who owns this embedding
             item_type: Type of item ("skill" or "need")
             ref_id: Reference ID for the item
             text: Text to embed
-            
+
         Returns:
             Embedding vector
         """

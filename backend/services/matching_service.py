@@ -21,8 +21,19 @@ logger = logging.getLogger(__name__)
 
 
 class MatchingService:
-    """
-    Hybrid matching service combining embeddings and LLM analysis.
+    """Two-layer matching engine pairing a user's needs with others' skills.
+
+    The pipeline runs in three phases:
+
+    1. **Embedding retrieval** (:meth:`_retrieve_candidates`) — every "skill
+       needed" and candidate "skill offered" is embedded and ranked by cosine
+       similarity; pairs scoring below ``MIN_EMBEDDING_SIMILARITY`` are dropped.
+    2. **LLM re-rank** (:meth:`_rerank_with_llm`) — the top candidates are
+       judged by the LLM, which decides whether the helper can actually teach
+       the need and adjusts the score/confidence. Can be skipped via
+       ``use_llm=False`` for a faster embeddings-only result.
+    3. **Reciprocity** (:meth:`_check_reciprocity`) — flags pairs where each
+       user can also help the other, enabling a mutual skill barter.
     """
     
     def __init__(
@@ -91,13 +102,20 @@ class MatchingService:
     ) -> List[MatchCandidate]:
         """
         Phase 1: Retrieve candidate matches using embeddings.
-        
+
+        Embeds each of the user's needs and each active helper's offered
+        skills, scores every (need, skill) pair by cosine similarity, keeps
+        only pairs at or above ``MIN_EMBEDDING_SIMILARITY``, and returns the
+        ``top_k`` highest-scoring candidates. Embeddings are fetched through
+        the cache, so repeat calls avoid re-embedding unchanged text.
+
         Args:
             user: User seeking help
             top_k: Number of candidates to retrieve
-            
+
         Returns:
-            List of candidate matches
+            List of candidate dicts, each carrying the embedding score and the
+            helper/skill/need objects needed by the LLM re-rank phase.
         """
         logger.info(f"Retrieving candidates for user {user.id}")
         
@@ -180,14 +198,21 @@ class MatchingService:
     ) -> List[MatchResult]:
         """
         Phase 2: Re-rank candidates using LLM analysis.
-        
+
+        For each candidate, asks the LLM whether the helper can actually teach
+        the seeker's need given both sides' proficiency and descriptions. Only
+        candidates the LLM marks ``can_help`` are kept, re-scored by the LLM's
+        adjusted score and confidence. If an LLM call fails, the candidate
+        falls back to its embedding score so a transient error never drops a
+        valid match.
+
         Args:
             user: User seeking help
             candidates: Candidate matches from embedding phase
             top_k: Number of final matches to return
-            
+
         Returns:
-            List of re-ranked matches
+            List of re-ranked matches, highest score first.
         """
         logger.info(f"Re-ranking {len(candidates)} candidates with LLM")
         
@@ -348,7 +373,7 @@ class MatchingService:
             
             # Mark as reciprocal if mutual help is possible
             if can_help_back:
-                match["is_reciprocal"] = True  # FIX: Actually set the flag
+                match["is_reciprocal"] = True
                 match["metadata"]["reverse_match"] = reverse_match_info
                 logger.info(
                     f"Reciprocal match found: {user.id} ↔ {helper.id} "
@@ -359,8 +384,13 @@ class MatchingService:
     
     def _skills_are_similar(self, skill1: str, skill2: str) -> bool:
         """
-        Check if two skill names are similar enough to be considered a match.
-        Simple keyword matching for now.
+        Heuristically decide whether two skill names refer to the same area.
+
+        Used only by reciprocity detection (not the main embedding match).
+        Returns True on an exact (case-insensitive) match or when both names
+        fall in the same hard-coded keyword group (e.g. "python" covers
+        django/flask/fastapi). This is a deliberately simple fallback and will
+        miss related skills outside the keyword table.
         """
         # Normalize
         s1 = skill1.lower().strip()
