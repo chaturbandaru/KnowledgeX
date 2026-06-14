@@ -1,15 +1,17 @@
-venv/
-.env.example
-backend/.env
-backend/venv/
-frontend/ven/
+# Secrets / environment
 .env
 env
+backend/.env
+
+# Virtualenvs
+venv/
+.venv/
+.ven/
+*ven/
+backend/venv/
+frontend/ven/
+
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-backend/core/__pycache__
-__pycache__/
-*.py[cod]
-.ven/
-*ven/
