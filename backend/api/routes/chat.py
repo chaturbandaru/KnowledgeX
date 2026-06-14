@@ -14,8 +14,15 @@ from api.middleware.auth import get_current_active_user
 from services.chat_service import create_chat_service
 from services.llm_service import create_llm_service
 import logging
+import os
 import re
-import tokenc
+
+# Token Company compression is an optional dependency. The app runs fine
+# without it; compression is simply skipped when tokenc is not installed.
+try:
+    import tokenc
+except ImportError:
+    tokenc = None
 
 logger = logging.getLogger(__name__)
 
@@ -25,10 +32,16 @@ router = APIRouter(prefix="/chat", tags=["Chat"])
 _token_client = None
 
 def get_token_client():
-    """Get or create token compression client."""
+    """Get or create the optional Token Company compression client.
+
+    Returns None (compression disabled) when the ``tokenc`` package is not
+    installed or no ``TTC_API_KEY`` is configured.
+    """
     global _token_client
+    if tokenc is None:
+        return None
     if _token_client is None:
-        api_key = os.getenv("TTC_API_KEY") or settings.TTC_API_KEY  # Add to your config
+        api_key = os.getenv("TTC_API_KEY") or getattr(settings, "TTC_API_KEY", None)
         if api_key:
             _token_client = tokenc.TokenClient(api_key=api_key)
         else:
