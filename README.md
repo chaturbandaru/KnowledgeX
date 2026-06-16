@@ -27,23 +27,41 @@ system.
 
 ## Architecture
 
-```
-┌──────────────────────────┐        HTTP / JSON         ┌──────────────────────────────┐
-│  Frontend (React + Vite) │ ─────────────────────────► │  Backend API (FastAPI)       │
-│  Tailwind CSS            │   http://localhost:8000/api │  backend/main.py  (port 8000)│
-└──────────────────────────┘ ◄───────────────────────── └───────────────┬──────────────┘
-                                                                         │ Motor (async)
-                                                          ┌──────────────▼──────────────┐
-                                                          │  MongoDB                     │
-                                                          │  users · matches · messages  │
-                                                          │  embeddings_cache            │
-                                                          └──────────────┬───────────────┘
-                                                                         │
-                                          ┌──────────────────────────────▼───────────────────────────┐
-                                          │  AI layer — OpenRouter (OpenAI-compatible API)            │
-                                          │  • LLM:        google/gemma-3-27b-it:free                 │
-                                          │  • Embeddings: openai/text-embedding-3-small (1536-dim)   │
-                                          └───────────────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    subgraph Client["🖥️ Client"]
+        UI["React 18 + Tailwind SPA<br/>bearer token in localStorage"]
+    end
+
+    subgraph API["⚙️ FastAPI Backend (backend/main.py · :8000)"]
+        direction TB
+        R["Routers<br/>auth · users · chat · matching · messages · barter"]
+        subgraph SVC["Service layer"]
+            CHAT["ChatService<br/>skill extraction"]
+            MATCH["MatchingService<br/>two-layer engine"]
+            EMB["EmbeddingService<br/>+ cache"]
+            LLM["LLMService"]
+            STORE["StorageService"]
+        end
+        R --> CHAT & MATCH
+        MATCH --> EMB & LLM & STORE
+        CHAT --> LLM
+    end
+
+    subgraph Data["🗄️ MongoDB (Motor async)"]
+        DB[("users · matches · messages<br/>embeddings_cache")]
+    end
+
+    subgraph AI["🤖 OpenRouter (OpenAI-compatible)"]
+        GEMMA["LLM<br/>google/gemma-3-27b-it:free"]
+        OAI["Embeddings<br/>openai/text-embedding-3-small · 1536-d"]
+    end
+
+    UI -- "HTTP / JSON<br/>/api" --> R
+    STORE <--> DB
+    EMB <--> DB
+    LLM --> GEMMA
+    EMB --> OAI
 ```
 
 ### Stack
@@ -66,6 +84,53 @@ system.
 3. **Reciprocity** (`_check_reciprocity`): detects pairs where each user can help the other, so the
    exchange is mutual.
 
+The full request flow, from a user asking for matches to the ranked, reciprocity-flagged result:
+
+```mermaid
+sequenceDiagram
+    actor U as User
+    participant FE as React SPA
+    participant API as FastAPI /matching
+    participant MS as MatchingService
+    participant ES as EmbeddingService
+    participant DB as MongoDB
+    participant OR as OpenRouter
+
+    U->>FE: Request matches
+    FE->>API: POST /api/matches/compute (Bearer)
+    API->>MS: find_matches_for_user(user_id)
+
+    rect rgb(235, 244, 255)
+    note over MS,OR: Layer 1 — embedding retrieval
+    MS->>ES: get_or_create(need / skill text)
+    ES->>DB: lookup embeddings_cache (hash + model)
+    alt cache miss
+        ES->>OR: embed (text-embedding-3-small)
+        OR-->>ES: 1536-d vector
+        ES->>DB: upsert cache
+    end
+    ES-->>MS: vectors
+    MS->>MS: cosine similarity, keep ≥ 0.4, top-K
+    end
+
+    rect rgb(237, 247, 237)
+    note over MS,OR: Layer 2 — LLM re-rank
+    MS->>OR: analyze_match (Gemma) per candidate
+    OR-->>MS: can_help, adjusted_score, confidence, explanation
+    MS->>MS: drop can_help=false, re-sort
+    end
+
+    rect rgb(255, 244, 235)
+    note over MS,DB: Reciprocity
+    MS->>DB: fetch helpers' skills_needed
+    MS->>MS: flag mutual (is_reciprocal)
+    end
+
+    MS-->>API: ranked matches
+    API-->>FE: 200 OK (matches JSON)
+    FE-->>U: Render match cards
+```
+
 ## Project layout
 
 ```
@@ -73,6 +138,122 @@ backend/        FastAPI app — api/ (routes), services/, models/, core/ (config
 frontend/       React + Tailwind single-page app
 tests/          pytest + standalone integration scripts (see below)
 run_server.py   entry point (uvicorn on port 8000)
+```
+
+## Data model
+
+MongoDB collections and their relationships. Skills are **embedded** documents inside each user
+(`skills_offered` / `skills_needed`), not a separate collection.
+
+```mermaid
+erDiagram
+    USERS ||--o{ SKILL_ITEM : embeds
+    USERS ||--o{ MATCHES : "appears in"
+    USERS ||--o{ MESSAGES : "sends / receives"
+    USERS ||--o{ EMBEDDINGS_CACHE : owns
+    MATCHES ||--o{ MESSAGES : initiates
+
+    USERS {
+        string _id PK
+        string email UK
+        string username UK
+        string full_name
+        string bio
+        string location
+        string hashed_password
+        array  skills_offered "embedded SKILL_ITEM[]"
+        array  skills_needed "embedded SKILL_ITEM[]"
+        array  chat_history
+        bool   is_active
+        bool   is_verified
+        datetime created_at
+    }
+    SKILL_ITEM {
+        string name
+        string description
+        string category
+        string proficiency_level "beginner..expert"
+        array  tags
+    }
+    MATCHES {
+        string _id PK
+        string user_id FK "seeker"
+        string matched_user_id FK "helper"
+        string skill_needed
+        string skill_offered
+        float  match_score "0..1"
+        float  confidence "0..1 (LLM)"
+        string explanation
+        string status "pending/accepted/rejected/expired"
+        bool   is_reciprocal
+        object metadata
+    }
+    MESSAGES {
+        string _id PK
+        string from_user_id FK
+        string to_user_id FK
+        string match_id FK
+        string content
+        bool   is_read
+        datetime created_at
+    }
+    EMBEDDINGS_CACHE {
+        string _id PK
+        string ownerUserId FK
+        string type "skill | need"
+        string refId
+        string model
+        string textHash "invalidation key"
+        int    dim "1536"
+        array  vector
+    }
+```
+
+A match moves through a simple lifecycle (`MatchStatus`):
+
+```mermaid
+stateDiagram-v2
+    [*] --> pending : engine computes match
+    pending --> accepted : helper accepts
+    pending --> rejected : helper declines
+    pending --> expired : no response
+    accepted --> [*] : conversation opens
+    rejected --> [*]
+    expired --> [*]
+```
+
+## Service design
+
+The matching engine composes three focused services behind `MatchingService`:
+
+```mermaid
+classDiagram
+    class MatchingService {
+        +find_matches_for_user(user_id, top_k, use_llm) List~Match~
+        -_retrieve_candidates(user, top_k)
+        -_rerank_with_llm(user, candidates, top_k)
+        -_check_reciprocity(user, matches)
+        -_skills_are_similar(a, b) bool
+    }
+    class EmbeddingService {
+        +get_or_create(owner, type, ref_id, text) Vector
+        +embed(texts) List~Vector~
+        +embed_batch_with_cache(items)
+        +cosine_similarity(a, b)$ float
+    }
+    class LLMService {
+        +analyze_match(seeker_need, helper_skills, ...) Analysis
+        -_build_match_analysis_prompt(...)
+    }
+    class StorageService {
+        +get_user_by_id(id) UserInDB
+        +get_active_users(limit, exclude_user_id)
+    }
+
+    MatchingService --> EmbeddingService : embeds & scores
+    MatchingService --> LLMService : re-ranks
+    MatchingService --> StorageService : loads users
+    EmbeddingService ..> LLMService : "shares OpenRouter key"
 ```
 
 ## Getting started
